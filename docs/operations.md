@@ -119,8 +119,10 @@ journalctl --user -u codex-issue-worker.service --since "$started_at" --no-pager
 
 ## 状态与日志
 
+检查 worker 服务状态时运行：
+
 ```bash
-systemctl --user status codex-issue-worker.service
+systemctl --user status codex-issue-worker.service --no-pager
 journalctl --user -u codex-issue-worker.service -n 100 --no-pager
 journalctl --user -u codex-issue-worker.service -f
 ```
