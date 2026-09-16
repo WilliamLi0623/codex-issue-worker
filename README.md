@@ -1,33 +1,64 @@
-# Codex Issue Worker
+# GitHub Issue 驱动的 Codex / Claude Worker
 
-Go 实现的持续运行 GitHub Issue worker。只处理 `GH_REPO` 中带 `codex-task` 标签的开放
-Issue；只接受作者关联为 `OWNER`、`MEMBER` 或 `COLLABORATOR` 的 Issue。领取后切换为 `in-progress`，在独立克隆的 `worker/issue-<number>` 分支调用 Codex
-或 Claude。执行模式会提交、推送任务分支并创建或复用 PR，不会直接推送默认分支。失败时
-尝试添加 `worker-failed` 并留言。`MAX_CONCURRENT_TASKS` 默认为 1，可设置有界并发。
+这是一个用 Go 编写的 Linux 常驻服务：轮询指定 GitHub 仓库中带任务标签、尚未标记为处理中，且作者关联为仓库所有者、成员或协作者的开放 Issue。worker 为每项任务创建独立工作目录和 `worker/issue-<number>` 分支，再调用 Codex CLI 或 Claude CLI；成功后推送任务分支并创建或复用 Pull Request，不会直接推送默认分支。
 
-默认是离线单次预览，不访问 GitHub、不启动 agent、不创建任务目录：
+## Requirements
+
+- Linux；仓库包含 Linux 专用的进程管理和文件锁实现。
+- Go 1.23 或更新版本。
+- Git 与 GitHub CLI（`gh`），并已登录有目标仓库访问权限的 GitHub 账号。
+- Codex CLI 或 Claude CLI，并已完成相应的交互式登录。
+
+## Installation
 
 ```bash
-cd /home/agent/data/projects/codex-issue-worker
-/home/agent/.local/opt/go1.27.1/bin/go test ./...
-/home/agent/.local/opt/go1.27.1/bin/go test -race ./...
-/home/agent/.local/opt/go1.27.1/bin/go vet ./...
-systemd-analyze --user verify systemd/codex-issue-worker.service
+git clone https://github.com/WilliamLi0623/codex-issue-worker.git
+cd codex-issue-worker
+go build -o codex-issue-worker ./cmd/worker
 ```
 
-Go 工具链用于构建和测试；服务运行时只需 Go worker 二进制、Git、已登录的 GitHub CLI
-和所选 agent CLI。`.env.example` 列出配置；systemd 从
-`/home/agent/.config/codex-issue-worker/worker.env` 读取配置。
+## Configuration
 
-Codex 默认使用 `AGENT_SANDBOX=workspace-write`，也支持 `read-only` 和
-`danger-full-access`；此配置不改变 Claude 的权限模式。本隔离 VM 的 bubblewrap
-在任务开始前报 `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`，
-因此部署的 worker.env 显式使用 `AGENT_SANDBOX=danger-full-access`。该模式关闭
-Codex 沙箱，依赖 VM 外部隔离；其他环境应保留默认值，纯读取任务可用 `read-only`。
+worker 从进程环境读取设置，不会自行加载 `.env` 文件。[`.env.example`](.env.example) 仅提供非敏感配置示例；部署服务时应由服务管理器加载配置。
 
-服务模板仅供 `agent` 的 systemd user manager 使用，由 Go worker 持续轮询并执行任务。
-启动服务前须确认授权仓库的 `codex-task` 队列为空。
-服务继承 user manager 身份，通过 `ConditionUser=agent` 限定运行用户，不设置 `User=`。
-安装、登录、日志观察与停止见 [运维说明](docs/operations.md)。
-部署后须确认服务为 `active (running)`、进程用户为 `agent`，并检查本次启动日志无错误；
-静态验证不能代替实际启动验证。
+| 变量 | 用途 | 默认值 |
+| --- | --- | --- |
+| `GH_REPO` | 唯一授权的 GitHub `owner/repository`，必填 | 无 |
+| `AGENT` | 执行任务的 CLI：`codex` 或 `claude` | `codex` |
+| `AGENT_SANDBOX` | Codex 沙箱模式：`read-only`、`workspace-write` 或 `danger-full-access` | `workspace-write` |
+| `TASK_LABEL` | worker 领取任务的 Issue 标签 | `codex-task` |
+| `IN_PROGRESS_LABEL` | 执行期间使用的标签 | `in-progress` |
+| `FAILED_LABEL` | 失败时添加的标签 | `worker-failed` |
+| `MAX_MINUTES` | 单个任务的总时限（正整数，分钟） | `120` |
+| `POLL_SECONDS` | 队列轮询间隔（正整数，秒） | `60` |
+| `MAX_CONCURRENT_TASKS` | 并发任务数上限（正整数） | `1` |
+| `WORK_ROOT` | 保存任务克隆、锁和日志的目录 | `/home/agent/data/tasks` |
+
+`danger-full-access` 会关闭 Codex 沙箱；仅应在具备外部隔离的环境中使用。该设置不改变 Claude 的权限模式。不要把凭据写入仓库或任务 Issue。
+
+## Quick start
+
+先确认目标仓库和队列确实适合自动执行：worker 启动后会持续轮询所有匹配标签的开放 Issue，并可能推送分支、创建 Pull Request。完成 GitHub CLI 与所选 agent CLI 登录后，在 Linux shell 中设置目标仓库并启动：
+
+```bash
+export GH_REPO=owner/repository
+./codex-issue-worker
+```
+
+该命令以前述构建步骤生成的二进制启动常驻 worker；默认每 60 秒轮询一次。首次启动前应阅读[运维说明](docs/operations.md)，并确认任务标签、Git 提交身份、认证和服务配置。
+
+## Testing
+
+在 Linux 仓库根目录运行：
+
+```bash
+go test ./...
+go test -race ./...
+go vet ./...
+```
+
+## Documentation
+
+- [运维说明](docs/operations.md)：配置、systemd user service、日志、任务观察、安全停止与回滚。
+- [systemd user service 模板](systemd/codex-issue-worker.service)
+
