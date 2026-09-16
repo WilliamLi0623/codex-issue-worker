@@ -9,8 +9,8 @@ StartLimitBurst=5
 Type=simple
 WorkingDirectory=/home/agent/data/projects/codex-issue-worker
 EnvironmentFile=/home/agent/.config/codex-issue-worker/worker.env
-Environment="PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin" "TMUX_TMPDIR=%t/codex-issue-worker"
-ExecStart=/usr/bin/python3 -B -m src.worker.cli --execute
+Environment="PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/agent/.local/bin/codex-issue-worker-go
 Restart=on-failure
 RestartSec=15
 NoNewPrivileges=yes
