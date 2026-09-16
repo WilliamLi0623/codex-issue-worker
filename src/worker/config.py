@@ -13,6 +13,7 @@ class Config:
     work_root: str = "/home/agent/data/tasks"
     poll_seconds: int = 60
     agent_tmux: bool = False
+    agent_sandbox: str = "workspace-write"
 
 
 def load_config(env: Mapping[str, str] | None = None) -> Config:
@@ -23,6 +24,9 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     agent = values.get("AGENT", "codex").strip().lower()
     if agent not in {"codex", "claude"}:
         raise ValueError("AGENT must be codex or claude")
+    agent_sandbox = values.get("AGENT_SANDBOX", "workspace-write")
+    if agent_sandbox not in {"read-only", "workspace-write", "danger-full-access"}:
+        raise ValueError("AGENT_SANDBOX must be read-only, workspace-write or danger-full-access")
     max_minutes = int(values.get("MAX_MINUTES", "120"))
     poll_seconds = int(values.get("POLL_SECONDS", "60"))
     if max_minutes <= 0 or poll_seconds <= 0:
@@ -33,6 +37,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     return Config(
         repo=repo,
         agent=agent,
+        agent_sandbox=agent_sandbox,
         task_label=values.get("TASK_LABEL", "codex-task"),
         in_progress_label=values.get("IN_PROGRESS_LABEL", "in-progress"),
         max_minutes=max_minutes,

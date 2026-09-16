@@ -9,6 +9,7 @@ class RunnerTests(unittest.TestCase):
         command = build_agent_command("codex", "Implement issue #7", Path("/work/repo"))
         self.assertEqual(command[:4], ["codex", "exec", "--cd", "/work/repo"])
         self.assertIn("Implement issue #7", command[-1])
+        self.assertEqual(command[4:6], ["--sandbox", "workspace-write"])
 
     def test_claude_command_is_print_mode(self):
         command = build_agent_command("claude", "Implement issue #7", Path("/work/repo"))
@@ -128,6 +129,20 @@ ISSUE = {"number": 7, "title": "Fix parser", "body": "Handle empty input",
 
 
 class OrchestrationTests(unittest.TestCase):
+    def test_configured_sandbox_reaches_codex_command(self):
+        from dataclasses import replace
+        from src.worker.config import load_config
+
+        for sandbox in ("read-only", "workspace-write", "danger-full-access"):
+            with self.subTest(sandbox=sandbox):
+                task = self.make_runner()
+                task.config = replace(load_config({"GH_REPO": "x/y", "AGENT_SANDBOX": sandbox}),
+                                      work_root=str(self.root))
+                result = task.run(ISSUE)
+                self.assertEqual(result.status, "succeeded")
+                command = next(command for command, _, _ in self.calls if command[0] == "codex")
+                self.assertEqual(command[4:6], ["--sandbox", sandbox])
+
     def test_runner_passes_observation_context_to_agent_executor(self):
         from src.worker.runner import CommandResult, TaskRunner
 

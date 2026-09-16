@@ -17,6 +17,7 @@
 | --- | --- |
 | `GH_REPO` | 必填，唯一授权的 `owner/repository`，使用前替换占位值 |
 | `AGENT` | `codex` 或 `claude`，默认 `codex` |
+| `AGENT_SANDBOX` | 仅用于 Codex：`read-only`、`workspace-write`（默认）或 `danger-full-access`；非法值在启动时拒绝 |
 | `TASK_LABEL` | 待处理标签，默认 `codex-task` |
 | `IN_PROGRESS_LABEL` | 领取标签，默认 `in-progress`，不能与待处理标签相同 |
 | `MAX_MINUTES` | 每任务总时间预算，正整数，默认 120 分钟 |
@@ -28,6 +29,29 @@
 权限设为 0600、所属用户为 agent。文件使用 `KEY=value`，不写 `export`，不依赖 shell
 变量展开。不把 token、密码或私钥写入仓库或示例。不要打印现有凭据文件。
 CLI 自身不加载 env 文件；手动运行时显式提供所需环境变量。
+
+### Codex 沙箱与本 VM
+
+worker 将 `AGENT_SANDBOX` 显式传给 `codex exec --sandbox`，不自动降级。
+一般环境保持 `.env.example` 的 `workspace-write`；仅需读取的任务可选 `read-only`。
+Claude 仍使用原有 `acceptEdits` 权限模式。
+
+本隔离 VM 处理 Issue #1 时，bubblewrap 在任何任务工作前失败：
+`bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`。
+部署文件 `/home/agent/.config/codex-issue-worker/worker.env` 因此显式设置：
+
+```ini
+AGENT_SANDBOX=danger-full-access
+```
+
+此模式关闭 Codex 沙箱，进程可访问 agent 用户可访问的文件及网络，依赖外部 VM 隔离；
+仓库限定、任务分支检查和默认分支保护不变，但不能代替沙箱。不要在普通共享主机上
+照搬此设置，也不要通过放宽 systemd 权限来绕过此故障。
+修改 env 文件不会改变已运行进程；按下文安全停止流程，在任务结束、检查队列后
+重新启动服务才生效。无需仅因 env 值变更执行 daemon-reload。
+恢复沙箱时将值改回 `workspace-write` 并按同样流程重启。
+本修复的单元测试和 systemd 静态验证不代表已重跑 Issue #1；重新排队需另行授权，
+避免重复提交、推送或创建 PR。
 
 在 agent 的交互终端用 `gh auth login` 完成 GitHub 登录，并使用所选 agent CLI 的交互登录流程。
 登录应由操作员完成，不把凭据放进命令行、日志或报告。确认 Git 的提交身份和 HTTPS

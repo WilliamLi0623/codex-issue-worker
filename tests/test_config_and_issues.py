@@ -16,6 +16,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.in_progress_label, "in-progress")
         self.assertEqual(config.max_minutes, 120)
 
+    def test_rejects_invalid_sandbox(self):
+        for sandbox in ("", "unknown", "danger-full-access --extra"):
+            with self.subTest(sandbox=sandbox):
+                with self.assertRaisesRegex(ValueError, "AGENT_SANDBOX"):
+                    load_config({"GH_REPO": "x/y", "AGENT_SANDBOX": sandbox})
+
     def test_rejects_unknown_agent(self):
         with self.assertRaises(ValueError):
             load_config({"GH_REPO": "x/y", "AGENT": "unknown"})

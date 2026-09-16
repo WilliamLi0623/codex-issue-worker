@@ -30,7 +30,7 @@ class ServiceConfigTests(unittest.TestCase):
     def test_example_documents_all_supported_settings_and_loads_safely(self):
         env = self.example_environment()
         self.assertEqual(set(env), {"GH_REPO", "AGENT", "TASK_LABEL", "IN_PROGRESS_LABEL",
-                                    "MAX_MINUTES", "WORK_ROOT", "POLL_SECONDS", "AGENT_TMUX"})
+                                    "MAX_MINUTES", "WORK_ROOT", "POLL_SECONDS", "AGENT_TMUX", "AGENT_SANDBOX"})
         config = load_config(env)
         self.assertEqual(config.repo, "owner/repository")
         self.assertFalse(config.agent_tmux)

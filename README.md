@@ -19,6 +19,12 @@ GitHub CLI 和所选 agent CLI；`AGENT_TMUX=1` 时需要 tmux。
 `.env.example` 列出全部配置；CLI 不会自动加载此文件，systemd 从
 `/home/agent/.config/codex-issue-worker/worker.env` 读取配置。
 
+Codex 默认使用 `AGENT_SANDBOX=workspace-write`，也支持 `read-only` 和
+`danger-full-access`；此配置不改变 Claude 的权限模式。本隔离 VM 的 bubblewrap
+在任务开始前报 `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`，
+因此部署的 worker.env 显式使用 `AGENT_SANDBOX=danger-full-access`。该模式关闭
+Codex 沙箱，依赖 VM 外部隔离；其他环境应保留默认值，纯读取任务可用 `read-only`。
+
 服务模板仅供 `agent` 的 systemd user manager 使用，以 `--execute` 持续轮询并执行任务。
 CLI 不带参数时仍为离线单次预览；启动服务前须确认授权仓库的 `codex-task` 队列为空。
 服务继承 user manager 身份，通过 `ConditionUser=agent` 限定运行用户，不设置 `User=`。

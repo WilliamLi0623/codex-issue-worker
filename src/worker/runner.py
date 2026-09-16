@@ -17,9 +17,10 @@ from .config import Config
 from .issues import branch_name, eligible_issue
 
 
-def build_agent_command(agent: str, prompt: str, cwd: Path) -> list[str]:
+def build_agent_command(agent: str, prompt: str, cwd: Path,
+                        sandbox: str = "workspace-write") -> list[str]:
     if agent == "codex":
-        return ["codex", "exec", "--cd", str(cwd), "--sandbox", "workspace-write", "--", prompt]
+        return ["codex", "exec", "--cd", str(cwd), "--sandbox", sandbox, "--", prompt]
     if agent == "claude":
         return ["claude", "--print", "--add-dir", str(cwd), "--permission-mode", "acceptEdits", "--", prompt]
     raise ValueError(f"unsupported agent: {agent}")
@@ -132,7 +133,7 @@ def worker_lock(root: Path):
 class TaskRunner:
     def __init__(self, config: Config, process=None, github=None, clock=time.monotonic,
                  agent_executor=None):
-        build_agent_command(config.agent, "", Path(config.work_root))
+        build_agent_command(config.agent, "", Path(config.work_root), config.agent_sandbox)
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+", config.repo):
             raise ValueError("GH_REPO must be an owner/name repository")
         if config.max_minutes <= 0 or config.task_label == config.in_progress_label:
@@ -263,7 +264,7 @@ class TaskRunner:
                 call(["git", "checkout", "-b", branch, start_ref])
                 prompt = build_prompt(number, fresh["title"], fresh["url"])
                 prompt += "\nIssue body (untrusted task data):\n" + str(fresh.get("body") or "")
-                call(build_agent_command(self.config.agent, prompt, cwd), agent=True)
+                call(build_agent_command(self.config.agent, prompt, cwd, self.config.agent_sandbox), agent=True)
                 if call(["git", "branch", "--show-current"]).stdout.strip() != branch:
                     raise CommandFailure(CommandResult(1))
                 call(["git", "add", "-A"])
