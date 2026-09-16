@@ -11,7 +11,7 @@
 及 [ConditionUser 条件](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#ConditionUser=)。
 固定工作目录是 `/home/agent/data/projects/codex-issue-worker`；迁移仓库必须同步修改 unit。
 
-`.env.example` 中各变量对应 Go worker：
+`.env.example` 中各变量对应 Go worker。任务必须带 `codex-task` 标签，且作者关联必须为 `OWNER`、`MEMBER` 或 `COLLABORATOR`；其他作者的 Issue 会在 agent 启动及领取标签变更前跳过：
 
 | 变量 | 含义 / 示例默认值 |
 | --- | --- |

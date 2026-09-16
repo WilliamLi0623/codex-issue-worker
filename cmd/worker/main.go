@@ -47,7 +47,7 @@ func run() error {
 			return fmt.Errorf("parse issues: %w", err)
 		}
 		for _, item := range issues {
-			if issue.Eligible(item, cfg.TaskLabel, cfg.InProgressLabel) {
+			if issue.Candidate(item, cfg.TaskLabel, cfg.InProgressLabel) {
 				pool.Submit(ctx, item)
 			}
 		}

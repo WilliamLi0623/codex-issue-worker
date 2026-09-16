@@ -6,18 +6,31 @@ import (
 )
 
 type Issue struct {
-	Number int     `json:"number"`
-	Title  string  `json:"title"`
-	Body   string  `json:"body"`
-	URL    string  `json:"url"`
-	State  string  `json:"state"`
-	Labels []Label `json:"labels"`
+	Number            int     `json:"number"`
+	Title             string  `json:"title"`
+	Body              string  `json:"body"`
+	URL               string  `json:"url"`
+	State             string  `json:"state"`
+	AuthorAssociation string  `json:"authorAssociation"`
+	Labels            []Label `json:"labels"`
 }
 type Label struct {
 	Name string `json:"name"`
 }
 
 func Eligible(i Issue, taskLabel, inProgressLabel string) bool {
+	if !Candidate(i, taskLabel, inProgressLabel) {
+		return false
+	}
+	switch strings.ToUpper(i.AuthorAssociation) {
+	case "OWNER", "MEMBER", "COLLABORATOR":
+		return true
+	default:
+		return false
+	}
+}
+
+func Candidate(i Issue, taskLabel, inProgressLabel string) bool {
 	if strings.ToUpper(i.State) != "OPEN" {
 		return false
 	}
