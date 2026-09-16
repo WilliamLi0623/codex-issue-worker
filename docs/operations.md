@@ -54,6 +54,13 @@ AGENT_SANDBOX=danger-full-access
 本修复的单元测试和 systemd 静态验证不代表已重跑 Issue #1；重新排队需另行授权，
 避免重复提交、推送或创建 PR。
 
+### Codex 模型默认值
+
+worker 调用 `codex exec` 时只设置工作目录和沙箱，不传 `--model`、`--profile` 或
+`--reasoning-effort` 覆盖。因此，Codex 使用 agent 用户的 `~/.codex/config.toml`
+中的默认设置。修改此配置只影响后续 Codex 调用，不会改变已经运行的 Codex 会话。
+当前未实现按任务自动路由模型。
+
 在 agent 的交互终端用 `gh auth login` 完成 GitHub 登录，并使用所选 agent CLI 的交互登录流程。
 登录应由操作员完成，不把凭据放进命令行、日志或报告。确认 Git 的提交身份和 HTTPS
 认证可供非交互进程使用。准备 `codex-task`、`in-progress`、`worker-failed` 标签；
