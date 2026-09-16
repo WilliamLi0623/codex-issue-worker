@@ -252,7 +252,7 @@ class TaskRunner:
                                 ".defaultBranchRef.name"], github=True, directory=root).stdout.strip()
                 if not default or default == branch:
                     raise CommandFailure(CommandResult(1))
-                remote = f"https://github.com/{self.config.repo}.git"
+                remote = f"git@github.com:{self.config.repo}.git"
                 call(["git", "clone", "--no-checkout", "--single-branch", "--branch", default,
                       remote, str(cwd)], directory=root)
                 start_ref = f"origin/{default}"

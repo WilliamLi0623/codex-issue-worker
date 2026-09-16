@@ -226,6 +226,14 @@ class OrchestrationTests(unittest.TestCase):
                                  github=runner.GitHubCLI("x/y", self.process),
                                  clock=lambda: self.now)
 
+    def test_clones_configured_repository_over_ssh(self):
+        task = self.make_runner()
+        result = task.run(ISSUE)
+        clones = [command for command, _, _ in self.calls if command[:2] == ["git", "clone"]]
+        self.assertEqual(clones, [["git", "clone", "--no-checkout", "--single-branch",
+                                   "--branch", "main", "git@github.com:x/y.git",
+                                   str(result.log_path.parent / "repo")]])
+
     def test_claims_runs_and_publishes_only_the_task_branch(self):
         task = self.make_runner()
         result = task.run(ISSUE)
@@ -239,7 +247,7 @@ class OrchestrationTests(unittest.TestCase):
         self.assertLess(commands.index(claim), agent_index)
         self.assertIn("Handle empty input", commands[agent_index][-1])
         self.assertIn(["git", "checkout", "-b", "worker/issue-7", "origin/main"], commands)
-        self.assertIn(["git", "push", "https://github.com/x/y.git",
+        self.assertIn(["git", "push", "git@github.com:x/y.git",
                        "HEAD:refs/heads/worker/issue-7"], commands)
         self.assertEqual(self.calls[agent_index][2], 120)
         self.assertEqual(self.calls[-1][2], 115)
@@ -372,7 +380,7 @@ class OrchestrationTests(unittest.TestCase):
         result = task.run(ISSUE)
         self.assertEqual(result.status, "succeeded")
         commands = [command for command, _, _ in self.calls]
-        self.assertIn(["git", "fetch", "https://github.com/x/y.git",
+        self.assertIn(["git", "fetch", "git@github.com:x/y.git",
                        "refs/heads/worker/issue-7:refs/remotes/origin/worker/issue-7"], commands)
         self.assertIn(["git", "checkout", "-b", "worker/issue-7", "origin/worker/issue-7"], commands)
         self.assertFalse(any("--force" in command for command in commands))
