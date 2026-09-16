@@ -40,12 +40,19 @@ class ServiceConfigTests(unittest.TestCase):
     def test_service_is_agent_user_scoped_and_loads_required_environment(self):
         config = self.service()
         service = config["Service"]
-        self.assertEqual(service["User"], "agent")
         self.assertEqual(config["Unit"]["ConditionUser"], "agent")
         self.assertEqual(Path(service["WorkingDirectory"]), ROOT)
         self.assertEqual(service["EnvironmentFile"],
                          "/home/agent/.config/codex-issue-worker/worker.env")
         self.assertEqual(config["Install"]["WantedBy"], "default.target")
+
+    def test_user_service_inherits_manager_credentials_without_group_setup(self):
+        service = self.service()["Service"]
+        # Explicit credentials can trigger privileged supplementary-group setup
+        # before ExecStart, failing with 216/GROUP in an unprivileged manager.
+        for directive in ("User", "Group", "SupplementaryGroups", "DynamicUser"):
+            with self.subTest(directive=directive):
+                self.assertNotIn(directive, service)
 
     def test_service_bounds_restart_resources_and_stops_its_process_tree(self):
         service = self.service()["Service"]

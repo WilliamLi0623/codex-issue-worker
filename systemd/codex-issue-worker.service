@@ -1,12 +1,12 @@
 [Unit]
 Description=Codex Issue Worker (offline dry-run by default)
+# Inherit the user manager's credentials; only agent may start this unit.
 ConditionUser=agent
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
 Type=simple
-User=agent
 WorkingDirectory=/home/agent/data/projects/codex-issue-worker
 EnvironmentFile=/home/agent/.config/codex-issue-worker/worker.env
 Environment="PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin" "TMUX_TMPDIR=%t/codex-issue-worker"

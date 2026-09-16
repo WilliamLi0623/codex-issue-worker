@@ -3,7 +3,12 @@
 ## 配置与登录
 
 所有运行和管理命令均在 `agent` 用户会话内执行，使用 `systemctl --user`，不要以 root
-安装为系统服务。模板通过 `User=agent` 和 `ConditionUser=agent` 限定身份。
+安装为系统服务。服务继承 user manager 的用户和组身份，通过 `ConditionUser=agent`
+检查 manager 是否以 agent 运行；不匹配时跳过启动。不要设置 `User=`、`Group=` 或
+`SupplementaryGroups=`：显式 `User=` 会触发附加组初始化，在无权限的 user manager
+中可能于 ExecStart 前报 `216/GROUP` 和 `Failed to determine supplementary groups: Operation not permitted`。
+参见 [systemd.exec 用户身份语义](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#User=)
+及 [ConditionUser 条件](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#ConditionUser=)。
 固定工作目录是 `/home/agent/data/projects/codex-issue-worker`；迁移仓库必须同步修改 unit。
 
 `.env.example` 中各变量对应现有源码：
@@ -19,7 +24,7 @@
 | `WORK_ROOT` | agent 可写绝对路径，默认 `/home/agent/data/tasks` |
 | `AGENT_TMUX` | `0` 直接捕获输出；`1` 使用实时 tmux 窗口 |
 
-未来部署时，将非敏感配置存放在 `/home/agent/.config/codex-issue-worker/worker.env`，
+部署时，将非敏感配置存放在 `/home/agent/.config/codex-issue-worker/worker.env`，
 权限设为 0600、所属用户为 agent。文件使用 `KEY=value`，不写 `export`，不依赖 shell
 变量展开。不把 token、密码或私钥写入仓库或示例。不要打印现有凭据文件。
 CLI 自身不加载 env 文件；手动运行时显式提供所需环境变量。
@@ -33,7 +38,7 @@ user service 不加载交互 shell 配置。模板 PATH 包含 `/home/agent/.loc
 `/usr/local/bin`、`/usr/bin`、`/bin`；如果工具位于其他目录，部署时明确调整 PATH。
 `NoNewPrivileges=yes` 禁止获得新权限；依赖提权的任务会失败。
 
-## 离线验证与未来部署
+## 离线验证与 user service 部署
 
 在仓库中运行：
 
@@ -50,12 +55,52 @@ systemd-analyze --user verify systemd/codex-issue-worker.service
 预览最多返回一个符合条件的分支，不调用 GitHub/agent，也不写任务日志。
 离线通过不代表登录、网络或真实执行已经验证。
 
-只有后续明确授权部署时，才把模板安装至
-`/home/agent/.config/systemd/user/codex-issue-worker.service`，准备上述 env 文件，
-再执行 `systemctl --user daemon-reload` 和 `systemctl --user start codex-issue-worker.service`。
+准备上述 env 文件后，以 agent 用户安装并验证默认 dry-run：
+
+```bash
+test "$(id -un)" = agent || exit 1
+install -D -m 0644 systemd/codex-issue-worker.service /home/agent/.config/systemd/user/codex-issue-worker.service
+systemctl --user daemon-reload
+systemctl --user cat codex-issue-worker.service
+systemctl --user start --wait codex-issue-worker.service
+systemctl --user status codex-issue-worker.service --no-pager
+systemctl --user show codex-issue-worker.service -p ConditionResult -p ActiveState -p SubState -p Result -p ExecMainCode -p ExecMainStatus -p ExecMainStartTimestamp -p NRestarts
+journalctl --user -u codex-issue-worker.service -n 20 --no-pager
+```
+
+启动前检查 `cat` 输出没有覆盖 ExecStart 的执行模式 drop-in。
 模板使用 `--dry-run --once`，成功后应为 `inactive (dead)`；`Restart=on-failure` 不会重启成功的预览。
+此时 `systemctl status` 返回 3 是 inactive 状态的正常表现，不是 worker 退出码。
+必须同时确认 `ConditionResult=yes`、`Result=success`、`ExecMainCode=1`（正常退出）、
+`ExecMainStatus=0`、`NRestarts=0`，以及本次启动时间对应的 journal 包含
+`{"dry_run": true, "results": []}`。仅有 inactive 或退出码 0 不能排除条件不匹配而跳过启动。
+未启用的 inactive unit 可能被 manager 回收，导致后续 `show` 的时间戳为空、
+`ConditionResult=no` 和 `ExecMainCode=0`；这不是本次执行的有效记录。
+此时可在具备发行版 `python3-dbus` 的主机上保持 D-Bus 引用，再运行一次离线验证：
+
+```bash
+/usr/bin/python3 -B - <<'PY'
+import dbus
+import subprocess
+
+bus = dbus.SessionBus()
+manager = dbus.Interface(
+    bus.get_object('org.freedesktop.systemd1', '/org/freedesktop/systemd1'),
+    'org.freedesktop.systemd1.Manager')
+unit = 'codex-issue-worker.service'
+manager.RefUnit(unit)
+try:
+    subprocess.run(['systemctl', '--user', 'start', '--wait', unit], check=True)
+    subprocess.run(['systemctl', '--user', 'status', unit, '--no-pager'])
+    subprocess.run(['systemctl', '--user', 'show', unit,
+                    '-p', 'ConditionResult', '-p', 'Result', '-p', 'ExecMainCode',
+                    '-p', 'ExecMainStatus', '-p', 'NRestarts'], check=True)
+finally:
+    manager.UnrefUnit(unit)
+PY
+```
+
 配置缺失等错误每 15 秒重试，300 秒内最多启动 5 次。
-本次 Task 3 不安装、不启动、不启用服务，也不配置 linger。
 
 真实执行会修改 GitHub、提交和推送代码；只有单独授权后才在 user unit drop-in 中明确替换：
 
