@@ -55,64 +55,39 @@ systemd-analyze --user verify systemd/codex-issue-worker.service
 预览最多返回一个符合条件的分支，不调用 GitHub/agent，也不写任务日志。
 离线通过不代表登录、网络或真实执行已经验证。
 
-准备上述 env 文件后，以 agent 用户安装并验证默认 dry-run：
+准备上述 env 文件后，以 agent 用户安装持续执行服务。模板已使用 `--execute`，
+不带 `--once`；启动即会轮询并处理授权仓库中的任务，无需执行模式 drop-in。
+CLI 的默认离线行为不变。没有 `EXECUTE` 环境开关。
 
 ```bash
 test "$(id -un)" = agent || exit 1
 install -D -m 0644 systemd/codex-issue-worker.service /home/agent/.config/systemd/user/codex-issue-worker.service
 systemctl --user daemon-reload
 systemctl --user cat codex-issue-worker.service
-systemctl --user start --wait codex-issue-worker.service
-systemctl --user status codex-issue-worker.service --no-pager
-systemctl --user show codex-issue-worker.service -p ConditionResult -p ActiveState -p SubState -p Result -p ExecMainCode -p ExecMainStatus -p ExecMainStartTimestamp -p NRestarts
-journalctl --user -u codex-issue-worker.service -n 20 --no-pager
 ```
 
-启动前检查 `cat` 输出没有覆盖 ExecStart 的执行模式 drop-in。
-模板使用 `--dry-run --once`，成功后应为 `inactive (dead)`；`Restart=on-failure` 不会重启成功的预览。
-此时 `systemctl status` 返回 3 是 inactive 状态的正常表现，不是 worker 退出码。
-必须同时确认 `ConditionResult=yes`、`Result=success`、`ExecMainCode=1`（正常退出）、
-`ExecMainStatus=0`、`NRestarts=0`，以及本次启动时间对应的 journal 包含
-`{"dry_run": true, "results": []}`。仅有 inactive 或退出码 0 不能排除条件不匹配而跳过启动。
-未启用的 inactive unit 可能被 manager 回收，导致后续 `show` 的时间戳为空、
-`ConditionResult=no` 和 `ExecMainCode=0`；这不是本次执行的有效记录。
-此时可在具备发行版 `python3-dbus` 的主机上保持 D-Bus 引用，再运行一次离线验证：
+启动前检查有效 ExecStart 为 `--execute` 且没有 `--once` 或旧 dry-run drop-in，
+确认 `ConditionUser=agent` 且没有 `User=`。将下面 GH_REPO 替换为 worker.env 中的授权仓库；
+TASK_LABEL 若有定制，也须检查对应队列。只读取 Issue，查询失败或队列非空时不要继续启动：
 
 ```bash
-/usr/bin/python3 -B - <<'PY'
-import dbus
-import subprocess
-
-bus = dbus.SessionBus()
-manager = dbus.Interface(
-    bus.get_object('org.freedesktop.systemd1', '/org/freedesktop/systemd1'),
-    'org.freedesktop.systemd1.Manager')
-unit = 'codex-issue-worker.service'
-manager.RefUnit(unit)
-try:
-    subprocess.run(['systemctl', '--user', 'start', '--wait', unit], check=True)
-    subprocess.run(['systemctl', '--user', 'status', unit, '--no-pager'])
-    subprocess.run(['systemctl', '--user', 'show', unit,
-                    '-p', 'ConditionResult', '-p', 'Result', '-p', 'ExecMainCode',
-                    '-p', 'ExecMainStatus', '-p', 'NRestarts'], check=True)
-finally:
-    manager.UnrefUnit(unit)
-PY
+GH_REPO=owner/repository
+queue=$(gh issue list --repo "$GH_REPO" --state open --label codex-task --limit 1 --json number) || exit 1
+test "$queue" = '[]' || exit 1
+started_at=$(date --iso-8601=seconds)
+systemctl --user start codex-issue-worker.service
+systemctl --user status codex-issue-worker.service --no-pager
+systemctl --user show codex-issue-worker.service -p ConditionResult -p ActiveState -p SubState -p Result -p MainPID -p ExecMainStatus -p NRestarts
+ps -o user=,pid=,args= -p "$(systemctl --user show codex-issue-worker.service -p MainPID --value)"
+journalctl --user -u codex-issue-worker.service --since "$started_at" --no-pager
 ```
 
+确认 `ConditionResult=yes`、`ActiveState=active`、`SubState=running`、`Result=success`、
+`ExecMainStatus=0`、`NRestarts=0`，MainPID 的用户为 agent、命令含 `--execute`。
+空队列每轮输出 `{"dry_run": false, "results": []}`；至少等待一个 POLL_SECONDS 间隔后，
+再次确认服务仍运行、重复输出空队列摘要且无错误或重启。仅 active 不能证明首次 GitHub 查询成功。
+队列检查只是启动时的快照，之后新加入的任务会被自动执行。
 配置缺失等错误每 15 秒重试，300 秒内最多启动 5 次。
-
-真实执行会修改 GitHub、提交和推送代码；只有单独授权后才在 user unit drop-in 中明确替换：
-
-```ini
-[Service]
-ExecStart=
-ExecStart=/usr/bin/python3 -B -m src.worker.cli --execute
-```
-
-清空原 ExecStart 后再指定新命令。不要保留 `--once`，否则不是持续轮询。
-没有 `EXECUTE` 环境开关，修改 worker.env 不会自动开启执行。
-应用 drop-in 后需要 daemon-reload，再按下文停止/核查流程启动。
 需要登录时自动启动或注销后继续运行属于后续部署决策，本次不执行 enable 或 linger。
 
 ## 状态与日志
@@ -179,8 +154,19 @@ OS 锁在持锁进程退出时释放；它只保护共用 WORK_ROOT 的本机执
 确认没有旧进程和已完成的结果后，才由操作员决定是否重新排队（恢复任务标签并移除领取标签）；
 不要盲目重试，先核对是否已推送或创建 PR。强制中断前已完成的外部操作不会自动撤销。
 
-回滚执行模式：先停止并核查，把 drop-in 的 ExecStart 改为模板中的
-`/usr/bin/python3 -B -m src.worker.cli --dry-run --once`，daemon-reload 后重新预览。
+回滚执行模式：先停止并核查，使用 `systemctl --user edit codex-issue-worker.service`
+设置以下 drop-in（必须先清空 ExecStart），保留文件与日志：
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/python3 -B -m src.worker.cli --dry-run --once
+```
+
+执行 `systemctl --user daemon-reload` 后用 `systemctl --user start --wait codex-issue-worker.service`
+重新预览，检查本次 journal 的 `{"dry_run": true, "results": []}` 和正常退出记录。
+预览成功后应为 `inactive (dead)`，此时 status 返回 3 属正常；成功预览不会被重启。
+恢复持续执行时把该 drop-in 命令改回 `--execute`，daemon-reload 后重新检查队列并启动。
 回滚版本时保留现有目录与日志，使用经审核的历史版本独立部署，不 reset 或强推历史。
 既有远端改动交由 PR 审查处理。不要自动删除克隆、日志或分支。
 

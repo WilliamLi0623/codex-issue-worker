@@ -19,7 +19,9 @@ GitHub CLI 和所选 agent CLI；`AGENT_TMUX=1` 时需要 tmux。
 `.env.example` 列出全部配置；CLI 不会自动加载此文件，systemd 从
 `/home/agent/.config/codex-issue-worker/worker.env` 读取配置。
 
-服务模板仅供 `agent` 的 systemd user manager 使用，默认 dry-run 成功后退出。
+服务模板仅供 `agent` 的 systemd user manager 使用，以 `--execute` 持续轮询并执行任务。
+CLI 不带参数时仍为离线单次预览；启动服务前须确认授权仓库的 `codex-task` 队列为空。
 服务继承 user manager 身份，通过 `ConditionUser=agent` 限定运行用户，不设置 `User=`。
-安装、登录、明确开启执行、日志、tmux 观察、停止与回滚见 [运维说明](docs/operations.md)。
-部署后须核对身份条件、本次 dry-run 日志和退出码；静态验证不能代替实际启动验证。
+安装、登录、执行模式核查、日志、tmux 观察、停止与回滚见 [运维说明](docs/operations.md)。
+部署后须确认服务为 `active (running)`、进程用户为 `agent`，并检查本次启动日志无错误；
+静态验证不能代替实际启动验证。

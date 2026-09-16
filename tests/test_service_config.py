@@ -1,8 +1,8 @@
 import configparser
+import io
 import json
 from pathlib import Path
 import shlex
-import subprocess
 import unittest
 
 from src.worker.config import load_config
@@ -71,19 +71,33 @@ class ServiceConfigTests(unittest.TestCase):
         self.assertEqual(service["RuntimeDirectory"], "codex-issue-worker")
         self.assertIn("TMUX_TMPDIR=%t/codex-issue-worker", shlex.split(service["Environment"]))
 
-    def test_packaged_start_command_runs_one_offline_cycle(self):
-        service = self.service()["Service"]
-        command = shlex.split(service["ExecStart"])
-        self.assertIn("--dry-run", command)
-        self.assertNotIn("--execute", command)
+    def test_packaged_start_command_executes_and_keeps_polling(self):
+        from src.worker.cli import main
+        from src.worker.runner import CommandResult
+
+        command = shlex.split(self.service()["Service"]["ExecStart"])
+        self.assertEqual(command[:5], ["/usr/bin/python3", "-B", "-m", "src.worker.cli", "--execute"])
         env = self.example_environment()
-        # No credentials or inherited environment; external CLIs cannot be found.
-        env["PATH"] = "/nonexistent"
-        result = subprocess.run(command, cwd=service["WorkingDirectory"], env=env,
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), {"dry_run": True, "results": []})
-        self.assertEqual(result.stderr, "")
+        env.update(WORK_ROOT=str(ROOT / ".test-artifacts" / "service"), POLL_SECONDS="9")
+        events = []
+
+        class Github:
+            def run(inner, args, cwd, timeout):
+                self.assertEqual(args[:2], ["issue", "list"])
+                events.append("poll")
+                return CommandResult(0, "[]")
+
+        def sleep(seconds):
+            events.append(seconds)
+            if events.count("poll") == 2:
+                raise KeyboardInterrupt
+
+        output = io.StringIO()
+        status = main(command[4:], env=env, github=Github(), stdout=output, sleep=sleep)
+        self.assertEqual(status, 130)
+        self.assertEqual(events, ["poll", 9, "poll", 9])
+        self.assertEqual([json.loads(line) for line in output.getvalue().splitlines()],
+                         [{"dry_run": False, "results": []}] * 2)
 
     def test_operations_cover_required_operator_actions(self):
         readme = self.read_file("README.md")

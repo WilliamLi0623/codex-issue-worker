@@ -1,5 +1,5 @@
 [Unit]
-Description=Codex Issue Worker (offline dry-run by default)
+Description=Codex Issue Worker (continuous execute mode)
 # Inherit the user manager's credentials; only agent may start this unit.
 ConditionUser=agent
 StartLimitIntervalSec=300
@@ -10,7 +10,7 @@ Type=simple
 WorkingDirectory=/home/agent/data/projects/codex-issue-worker
 EnvironmentFile=/home/agent/.config/codex-issue-worker/worker.env
 Environment="PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin" "TMUX_TMPDIR=%t/codex-issue-worker"
-ExecStart=/usr/bin/python3 -B -m src.worker.cli --dry-run --once
+ExecStart=/usr/bin/python3 -B -m src.worker.cli --execute
 Restart=on-failure
 RestartSec=15
 NoNewPrivileges=yes
