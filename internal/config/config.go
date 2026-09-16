@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -74,6 +75,9 @@ func Load(env map[string]string) (Config, error) {
 	}
 	if cfg.TaskLabel == "" || cfg.InProgressLabel == "" || cfg.FailedLabel == "" || cfg.TaskLabel == cfg.InProgressLabel {
 		return Config{}, fmt.Errorf("invalid labels")
+	}
+	if !filepath.IsAbs(cfg.WorkRoot) {
+		return Config{}, fmt.Errorf("WORK_ROOT must be an absolute path")
 	}
 	return cfg, nil
 }
