@@ -1,0 +1,30 @@
+[Unit]
+Description=Codex Issue Worker (continuous execute mode)
+# Inherit the user manager's credentials; only agent may start this unit.
+ConditionUser=agent
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/agent/data/projects/codex-issue-worker
+EnvironmentFile=/home/agent/.config/codex-issue-worker/worker.env
+Environment="PATH=/home/agent/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/agent/.local/bin/codex-issue-worker-go
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=yes
+UMask=0077
+CPUQuota=200%
+MemoryMax=4G
+TasksMax=512
+LimitNOFILE=4096
+KillMode=control-group
+TimeoutStopSec=30
+RuntimeDirectory=codex-issue-worker
+RuntimeDirectoryMode=0700
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
