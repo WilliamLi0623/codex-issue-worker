@@ -1,0 +1,24 @@
+# Local test output and Python caches
+.test-artifacts/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local environment and authentication material
+.env
+.env.*
+!.env.example
+*.env
+credentials.json
+credentials/
+.credentials/
+secrets/
+.secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
