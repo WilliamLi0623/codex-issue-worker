@@ -236,6 +236,11 @@ func (r *TaskRunner) fetchIssue(ctx context.Context, number int) (issue.Issue, e
 	if err := json.Unmarshal([]byte(out.Stdout), &value); err != nil {
 		return issue.Issue{}, fmt.Errorf("parse issue: %w", err)
 	}
+	association := r.cmd.Run(ctx, "", "gh", "api", "repos/"+r.cfg.Repo+"/issues/"+strconv.Itoa(number), "--jq", ".author_association")
+	if association.Err != nil {
+		return issue.Issue{}, commandError("read issue author association", association)
+	}
+	value.AuthorAssociation = strings.ToUpper(strings.TrimSpace(association.Stdout))
 	return value, nil
 }
 func (r *TaskRunner) reportFailure(ctx context.Context, number int, cause error) {

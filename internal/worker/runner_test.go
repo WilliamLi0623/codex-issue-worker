@@ -48,6 +48,7 @@ func TestRunnerSkipsIssueFromAnotherRepository(t *testing.T) {
 		"gh issue view 7 --repo x/y --json number,title,body,url,state,labels": {
 			Stdout: `{"number":7,"title":"other","url":"https://github.com/other/repo/issues/7","state":"OPEN","labels":[{"name":"codex-task"}]}`,
 		},
+		"gh api repos/x/y/issues/7 --jq .author_association": {Stdout: "OWNER\n"},
 	}}
 	r := NewRunner(config.Config{Repo: "x/y", MaxMinutes: 1, TaskLabel: "codex-task", InProgressLabel: "in-progress"}, f)
 	res := r.Run(context.Background(), issue.Issue{Number: 7, State: "OPEN", Labels: []issue.Label{{Name: "codex-task"}}})
@@ -57,6 +58,26 @@ func TestRunnerSkipsIssueFromAnotherRepository(t *testing.T) {
 	for _, c := range f.calls {
 		if strings.Contains(strings.Join(c, " "), "--add-label in-progress") {
 			t.Fatal("claimed issue from another repository")
+		}
+	}
+}
+
+func TestRunnerSkipsUntrustedIssueBeforeClaimOrAgent(t *testing.T) {
+	f := &fakeCmd{responses: map[string]CommandResult{
+		"gh issue view 7 --repo x/y --json number,title,body,url,state,labels": {
+			Stdout: `{"number":7,"title":"external request","url":"https://github.com/x/y/issues/7","state":"OPEN","labels":[{"name":"codex-task"}]}`,
+		},
+		"gh api repos/x/y/issues/7 --jq .author_association": {Stdout: "CONTRIBUTOR\n"},
+	}}
+	r := NewRunner(config.Config{Repo: "x/y", MaxMinutes: 1, TaskLabel: "codex-task", InProgressLabel: "in-progress"}, f)
+	res := r.Run(context.Background(), issue.Issue{Number: 7})
+	if res.Status != Skipped {
+		t.Fatalf("status=%s want skipped", res.Status)
+	}
+	for _, call := range f.calls {
+		joined := strings.Join(call[1:], " ")
+		if strings.Contains(joined, "gh issue edit") || strings.HasPrefix(joined, "codex ") {
+			t.Fatalf("untrusted issue caused a side effect: %s", joined)
 		}
 	}
 }
@@ -73,11 +94,12 @@ func TestRunnerResumesBranchAndCreatesCompatiblePullRequest(t *testing.T) {
 		"gh issue view 7 --repo x/y --json number,title,body,url,state,labels": {
 			Stdout: `{"number":7,"title":"Fix parser","body":"details","url":"https://github.com/x/y/issues/7","state":"OPEN","labels":[{"name":"codex-task"}]}`,
 		},
-		"gh repo view x/y --json defaultBranchRef --jq .defaultBranchRef.name":               {Stdout: "main\n"},
-		"git ls-remote --exit-code --heads git@github.com:x/y.git refs/heads/worker/issue-7": {Stdout: "abc refs/heads/worker/issue-7\n"},
-		"git branch --show-current":              {Stdout: "worker/issue-7\n"},
-		"git diff --cached --quiet":              {ExitCode: 1, Err: errors.New("exit status 1")},
-		"git rev-list --count origin/main..HEAD": {Stdout: "2\n"},
+		"gh api repos/x/y/issues/7 --jq .author_association":                                                    {Stdout: "OWNER\n"},
+		"gh repo view x/y --json defaultBranchRef --jq .defaultBranchRef.name":                                  {Stdout: "main\n"},
+		"git ls-remote --exit-code --heads git@github.com:x/y.git refs/heads/worker/issue-7":                    {Stdout: "abc refs/heads/worker/issue-7\n"},
+		"git branch --show-current":                                                                             {Stdout: "worker/issue-7\n"},
+		"git diff --cached --quiet":                                                                             {ExitCode: 1, Err: errors.New("exit status 1")},
+		"git rev-list --count origin/main..HEAD":                                                                {Stdout: "2\n"},
 		"gh pr list --repo x/y --head worker/issue-7 --base main --state open --json url":                       {Stdout: "[]"},
 		"gh pr create --repo x/y --base main --head worker/issue-7 --title Fix #7: Fix parser --body Closes #7": {Stdout: "https://github.com/x/y/pull/9\n"},
 	}
@@ -116,10 +138,11 @@ func TestRunnerPersistsAgentOutputAndTaskEvents(t *testing.T) {
 		"gh issue view 7 --repo x/y --json number,title,body,url,state,labels": {
 			Stdout: `{"number":7,"title":"Fix parser","body":"body","url":"https://github.com/x/y/issues/7","state":"OPEN","labels":[{"name":"codex-task"}]}`,
 		},
-		"gh repo view x/y --json defaultBranchRef --jq .defaultBranchRef.name":               {Stdout: "main\n"},
-		"git ls-remote --exit-code --heads git@github.com:x/y.git refs/heads/worker/issue-7": {ExitCode: 2, Err: errors.New("exit status 2")},
-		"git branch --show-current":              {Stdout: "worker/issue-7\n"},
-		"git rev-list --count origin/main..HEAD": {Stdout: "1\n"},
+		"gh api repos/x/y/issues/7 --jq .author_association":                                                    {Stdout: "OWNER\n"},
+		"gh repo view x/y --json defaultBranchRef --jq .defaultBranchRef.name":                                  {Stdout: "main\n"},
+		"git ls-remote --exit-code --heads git@github.com:x/y.git refs/heads/worker/issue-7":                    {ExitCode: 2, Err: errors.New("exit status 2")},
+		"git branch --show-current":                                                                             {Stdout: "worker/issue-7\n"},
+		"git rev-list --count origin/main..HEAD":                                                                {Stdout: "1\n"},
 		"gh pr list --repo x/y --head worker/issue-7 --base main --state open --json url":                       {Stdout: "[]"},
 		"gh pr create --repo x/y --base main --head worker/issue-7 --title Fix #7: Fix parser --body Closes #7": {Stdout: "https://github.com/x/y/pull/9\n"},
 	}}

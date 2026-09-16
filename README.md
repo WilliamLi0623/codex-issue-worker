@@ -1,7 +1,7 @@
 # Codex Issue Worker
 
 Go 实现的持续运行 GitHub Issue worker。只处理 `GH_REPO` 中带 `codex-task` 标签的开放
-Issue；领取后切换为 `in-progress`，在独立克隆的 `worker/issue-<number>` 分支调用 Codex
+Issue；只接受作者关联为 `OWNER`、`MEMBER` 或 `COLLABORATOR` 的 Issue。领取后切换为 `in-progress`，在独立克隆的 `worker/issue-<number>` 分支调用 Codex
 或 Claude。执行模式会提交、推送任务分支并创建或复用 PR，不会直接推送默认分支。失败时
 尝试添加 `worker-failed` 并留言。`MAX_CONCURRENT_TASKS` 默认为 1，可设置有界并发。
 
