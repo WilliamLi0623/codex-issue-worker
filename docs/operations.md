@@ -25,11 +25,18 @@
 | `MAX_CONCURRENT_TASKS` | 同时运行任务上限，正整数，默认 1；满载时留待后续轮询 |
 | `WORK_ROOT` | agent 可写绝对路径，默认 `/home/agent/data/tasks` |
 | `FAILED_LABEL` | 失败标签，默认 `worker-failed` |
+| `AUTO_MERGE` | 是否为 worker 创建或恢复的 PR 请求 GitHub 保护性自动合并，默认 `false`；请求使用 squash，不绕过评审、检查或冲突保护 |
 
 部署时，将非敏感配置存放在 `/home/agent/.config/codex-issue-worker/worker.env`，
 权限设为 0600、所属用户为 agent。文件使用 `KEY=value`，不写 `export`，不依赖 shell
 变量展开。不把 token、密码或私钥写入仓库或示例。不要打印现有凭据文件。
 CLI 自身不加载 env 文件；手动运行时显式提供所需环境变量。
+
+启用 `AUTO_MERGE=true` 前，确认仓库的分支保护和自动合并策略符合预期。worker 使用
+`gh pr merge <url> --auto --squash` 请求 GitHub 正常的保护性流程，不直接合并、不自动批准
+评审、不删除分支，也不强制推送。请求被 GitHub 拒绝时，事件日志会记录拒绝原因，但任务仍
+会成功返回 PR URL；查看 `events.jsonl` 中的 `auto_merge_skipped`、`auto_merge_requested` 或
+`auto_merge_rejected` 事件。
 
 ### Codex 沙箱与本 VM
 

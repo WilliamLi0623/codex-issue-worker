@@ -218,6 +218,16 @@ func (r *TaskRunner) Run(parent context.Context, original issue.Issue) (result R
 		}
 		prURL = strings.TrimSpace(created.Stdout)
 	}
+	if r.cfg.AutoMerge {
+		merged := run(repoDir, "gh", "pr", "merge", prURL, "--auto", "--squash")
+		if commandSucceeded(merged) {
+			recordEvent(events, "auto_merge_requested", map[string]any{"url": prURL, "method": "squash", "reason": "GitHub accepted the protected auto-merge request"})
+		} else {
+			recordEvent(events, "auto_merge_rejected", map[string]any{"url": prURL, "method": "squash", "reason": commandError("request auto merge", merged).Error()})
+		}
+	} else {
+		recordEvent(events, "auto_merge_skipped", map[string]any{"url": prURL, "reason": "disabled by configuration"})
+	}
 	release := run("", "gh", "issue", "edit", strconv.Itoa(fresh.Number), "--repo", r.cfg.Repo, "--remove-label", r.cfg.InProgressLabel)
 	if !commandSucceeded(release) {
 		result.Err = commandError("release claim", release)

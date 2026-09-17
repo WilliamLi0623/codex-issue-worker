@@ -19,6 +19,7 @@ type Config struct {
 	WorkRoot           string
 	PollSeconds        int
 	MaxConcurrentTasks int
+	AutoMerge          bool
 }
 
 func FromOS() (Config, error) {
@@ -72,6 +73,9 @@ func Load(env map[string]string) (Config, error) {
 	}
 	if cfg.MaxConcurrentTasks, err = positive(get("MAX_CONCURRENT_TASKS", "1")); err != nil {
 		return Config{}, fmt.Errorf("MAX_CONCURRENT_TASKS: %w", err)
+	}
+	if cfg.AutoMerge, err = strconv.ParseBool(get("AUTO_MERGE", "false")); err != nil {
+		return Config{}, fmt.Errorf("AUTO_MERGE: must be true or false")
 	}
 	if cfg.TaskLabel == "" || cfg.InProgressLabel == "" || cfg.FailedLabel == "" || cfg.TaskLabel == cfg.InProgressLabel {
 		return Config{}, fmt.Errorf("invalid labels")
