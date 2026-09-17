@@ -19,8 +19,28 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.AgentSandbox != "workspace-write" {
 		t.Fatalf("sandbox=%q", cfg.AgentSandbox)
 	}
+	if cfg.AutoMerge {
+		t.Fatal("auto merge must be disabled by default")
+	}
 	if cfg.WorkRoot != "/home/agent/data/tasks" {
 		t.Fatalf("work root=%q", cfg.WorkRoot)
+	}
+}
+
+func TestLoadAutoMerge(t *testing.T) {
+	cfg, err := Load(map[string]string{"GH_REPO": "x/y", "AUTO_MERGE": "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoMerge {
+		t.Fatal("auto merge=true was not loaded")
+	}
+}
+
+func TestLoadRejectsInvalidAutoMerge(t *testing.T) {
+	_, err := Load(map[string]string{"GH_REPO": "x/y", "AUTO_MERGE": "sometimes"})
+	if err == nil {
+		t.Fatal("expected invalid AUTO_MERGE to be rejected")
 	}
 }
 

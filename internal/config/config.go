@@ -9,17 +9,18 @@ import (
 )
 
 type Config struct {
-	Repo                   string
-	Agent                  string
-	AgentSandbox           string
-	TaskLabel              string
-	InProgressLabel        string
-	FailedLabel            string
-	MaxMinutes             int
-	WorkRoot               string
-	PollSeconds            int
-	MaxConcurrentTasks     int
+	Repo               string
+	Agent              string
+	AgentSandbox       string
+	TaskLabel          string
+	InProgressLabel    string
+	FailedLabel        string
+	MaxMinutes         int
+	WorkRoot           string
+	PollSeconds        int
+	MaxConcurrentTasks int
 	CompletedTaskRetention int
+	AutoMerge          bool
 }
 
 func FromOS() (Config, error) {
@@ -76,6 +77,9 @@ func Load(env map[string]string) (Config, error) {
 	}
 	if cfg.CompletedTaskRetention, err = positive(get("COMPLETED_TASK_RETENTION", "10")); err != nil {
 		return Config{}, fmt.Errorf("COMPLETED_TASK_RETENTION: %w", err)
+	}
+	if cfg.AutoMerge, err = strconv.ParseBool(get("AUTO_MERGE", "false")); err != nil {
+		return Config{}, fmt.Errorf("AUTO_MERGE: must be true or false")
 	}
 	if cfg.TaskLabel == "" || cfg.InProgressLabel == "" || cfg.FailedLabel == "" || cfg.TaskLabel == cfg.InProgressLabel {
 		return Config{}, fmt.Errorf("invalid labels")
