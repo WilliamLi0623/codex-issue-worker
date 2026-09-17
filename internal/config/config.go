@@ -9,16 +9,17 @@ import (
 )
 
 type Config struct {
-	Repo               string
-	Agent              string
-	AgentSandbox       string
-	TaskLabel          string
-	InProgressLabel    string
-	FailedLabel        string
-	MaxMinutes         int
-	WorkRoot           string
-	PollSeconds        int
-	MaxConcurrentTasks int
+	Repo                   string
+	Agent                  string
+	AgentSandbox           string
+	TaskLabel              string
+	InProgressLabel        string
+	FailedLabel            string
+	MaxMinutes             int
+	WorkRoot               string
+	PollSeconds            int
+	MaxConcurrentTasks     int
+	CompletedTaskRetention int
 }
 
 func FromOS() (Config, error) {
@@ -72,6 +73,9 @@ func Load(env map[string]string) (Config, error) {
 	}
 	if cfg.MaxConcurrentTasks, err = positive(get("MAX_CONCURRENT_TASKS", "1")); err != nil {
 		return Config{}, fmt.Errorf("MAX_CONCURRENT_TASKS: %w", err)
+	}
+	if cfg.CompletedTaskRetention, err = positive(get("COMPLETED_TASK_RETENTION", "10")); err != nil {
+		return Config{}, fmt.Errorf("COMPLETED_TASK_RETENTION: %w", err)
 	}
 	if cfg.TaskLabel == "" || cfg.InProgressLabel == "" || cfg.FailedLabel == "" || cfg.TaskLabel == cfg.InProgressLabel {
 		return Config{}, fmt.Errorf("invalid labels")

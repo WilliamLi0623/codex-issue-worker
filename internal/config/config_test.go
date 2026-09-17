@@ -13,7 +13,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Agent != "codex" || cfg.TaskLabel != "codex-task" || cfg.InProgressLabel != "in-progress" {
 		t.Fatalf("unsafe defaults: %+v", cfg)
 	}
-	if cfg.MaxMinutes != 120 || cfg.PollSeconds != 60 || cfg.MaxConcurrentTasks != 1 {
+	if cfg.MaxMinutes != 120 || cfg.PollSeconds != 60 || cfg.MaxConcurrentTasks != 1 || cfg.CompletedTaskRetention != 10 {
 		t.Fatalf("unexpected limits: %+v", cfg)
 	}
 	if cfg.AgentSandbox != "workspace-write" {
@@ -31,6 +31,7 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"GH_REPO": "x/y", "AGENT_SANDBOX": "bad"},
 		{"GH_REPO": "x/y", "MAX_CONCURRENT_TASKS": "0"},
 		{"GH_REPO": "x/y", "POLL_SECONDS": "0"},
+		{"GH_REPO": "x/y", "COMPLETED_TASK_RETENTION": "0"},
 	}
 	for _, env := range cases {
 		if _, err := Load(env); err == nil {
@@ -56,5 +57,15 @@ func TestLoadAcceptsAbsoluteWorkRoot(t *testing.T) {
 	}
 	if cfg.WorkRoot != "/var/lib/worker/tasks" {
 		t.Fatalf("work root=%q", cfg.WorkRoot)
+	}
+}
+
+func TestLoadAcceptsCompletedTaskRetention(t *testing.T) {
+	cfg, err := Load(map[string]string{"GH_REPO": "x/y", "COMPLETED_TASK_RETENTION": "3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CompletedTaskRetention != 3 {
+		t.Fatalf("completed task retention=%d", cfg.CompletedTaskRetention)
 	}
 }
