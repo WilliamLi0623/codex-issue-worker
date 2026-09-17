@@ -126,6 +126,29 @@ journalctl --user -u codex-issue-worker.service --since "$started_at" --no-pager
 
 ## 状态与日志
 
+### 远程状态摘要
+
+在操作员机器构建并运行只读状态客户端；将目标替换为可通过 SSH 登录的 worker
+主机，不要把密码、token 或私钥作为参数传入：
+
+```bash
+go build -o codex-issue-worker-status ./cmd/status
+./codex-issue-worker-status --host agent@worker.example.com
+```
+
+客户端在远端固定检查 `codex-issue-worker.service`、部署 checkout
+`/home/agent/data/projects/codex-issue-worker`、`worker.env` 中的 `WORK_ROOT`、
+`GH_REPO` 和 `TASK_LABEL`，并查询当前开放且带任务标签的 Issue。输出字段为：
+
+- `Service`：`ActiveState`、`SubState`、`Result` 和 `MainPID`。
+- `Checkout`：部署 checkout 的路径。
+- `Commit`：该 checkout 当前 `HEAD`。
+- `Active task directories`：`WORK_ROOT` 下匹配 `issue-*` 的一级目录名；不包含日志内容。
+- `Queue (<TASK_LABEL>)`：Issue 编号、标题和 URL。
+
+这个命令只执行 `systemctl --user show`、`git rev-parse`、`find` 和
+`gh issue list`；不会停止或重启服务、修改标签、删除目录、重新排队任务或读取任务日志。
+
 检查 worker 服务状态时运行：
 
 ```bash

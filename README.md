@@ -15,6 +15,7 @@
 git clone https://github.com/WilliamLi0623/codex-issue-worker.git
 cd codex-issue-worker
 go build -o codex-issue-worker ./cmd/worker
+go build -o codex-issue-worker-status ./cmd/status
 ```
 
 ## Configuration
@@ -57,6 +58,23 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+## Remote status
+
+Build the read-only status client and run it from an operator machine with SSH access
+to the `agent` account on the worker host:
+
+```bash
+go build -o codex-issue-worker-status ./cmd/status
+./codex-issue-worker-status --host agent@worker.example.com
+```
+
+The command runs `systemctl --user show`, `git rev-parse`, `find`, and `gh issue list`
+on the remote host. It does not stop or restart the service, alter labels, requeue
+issues, inspect task logs, or print credentials. Output fields are the service active
+state/substate/result/PID, deployed checkout path, deployed commit, active task
+directory names, and the current open Issue queue for `TASK_LABEL` (default
+`codex-task`).
 
 ## Documentation
 
