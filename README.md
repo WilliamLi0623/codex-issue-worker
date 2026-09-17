@@ -29,6 +29,7 @@ worker 从进程环境读取设置，不会自行加载 `.env` 文件。[`.env.e
 | `TASK_LABEL` | worker 领取任务的 Issue 标签 | `codex-task` |
 | `IN_PROGRESS_LABEL` | 执行期间使用的标签 | `in-progress` |
 | `FAILED_LABEL` | 失败时添加的标签 | `worker-failed` |
+| `AUTO_MERGE` | 成功创建或复用 worker PR 后请求 GitHub 保护性自动合并；失败不会使任务失败 | `false` |
 | `MAX_MINUTES` | 单个任务的总时限（正整数，分钟） | `120` |
 | `POLL_SECONDS` | 队列轮询间隔（正整数，秒） | `60` |
 | `MAX_CONCURRENT_TASKS` | 并发任务数上限（正整数） | `1` |
@@ -38,7 +39,7 @@ worker 从进程环境读取设置，不会自行加载 `.env` 文件。[`.env.e
 
 ## Quick start
 
-先确认目标仓库和队列确实适合自动执行：worker 启动后会持续轮询所有匹配标签的开放 Issue，并可能推送分支、创建 Pull Request。完成 GitHub CLI 与所选 agent CLI 登录后，在 Linux shell 中设置目标仓库并启动：
+先确认目标仓库和队列确实适合自动执行：worker 启动后会持续轮询所有匹配标签的开放 Issue，并可能推送分支、创建 Pull Request。`AUTO_MERGE=true` 时，worker 只会对自己创建或恢复的 PR 请求 GitHub 的保护性自动合并，使用 squash 方法；不会绕过评审、检查或冲突规则。完成 GitHub CLI 与所选 agent CLI 登录后，在 Linux shell 中设置目标仓库并启动：
 
 ```bash
 export GH_REPO=owner/repository

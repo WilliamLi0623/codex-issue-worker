@@ -130,6 +130,77 @@ func TestRunnerResumesBranchAndCreatesCompatiblePullRequest(t *testing.T) {
 			t.Errorf("missing command %q", expected)
 		}
 	}
+	for _, got := range joined {
+		if strings.HasPrefix(got, "gh pr merge ") {
+			t.Fatalf("auto merge requested while disabled: %s", got)
+		}
+	}
+}
+
+func TestRunnerRequestsAutoMergeForWorkerPullRequest(t *testing.T) {
+	responses := successfulPullRequestResponses()
+	responses["gh pr merge https://github.com/x/y/pull/9 --auto --squash"] = CommandResult{}
+	f := &fakeCmd{responses: responses}
+	r := NewRunner(config.Config{Repo: "x/y", Agent: "codex", AgentSandbox: "workspace-write", WorkRoot: t.TempDir(), MaxMinutes: 1, TaskLabel: "codex-task", InProgressLabel: "in-progress", FailedLabel: "worker-failed", AutoMerge: true}, f)
+	res := r.Run(context.Background(), issue.Issue{Number: 7})
+	if res.Status != Succeeded || res.PRURL != "https://github.com/x/y/pull/9" {
+		t.Fatalf("result=%+v", res)
+	}
+	if !containsCall(f.calls, "gh pr merge https://github.com/x/y/pull/9 --auto --squash") {
+		t.Fatal("auto merge command was not requested")
+	}
+	assertTaskEvent(t, r.cfg.WorkRoot, `"event":"auto_merge_requested"`)
+}
+
+func TestRunnerContinuesWhenAutoMergeIsRejected(t *testing.T) {
+	responses := successfulPullRequestResponses()
+	responses["gh pr merge https://github.com/x/y/pull/9 --auto --squash"] = CommandResult{ExitCode: 1, Err: errors.New("exit status 1"), Stderr: "required checks are not complete"}
+	f := &fakeCmd{responses: responses}
+	r := NewRunner(config.Config{Repo: "x/y", Agent: "codex", AgentSandbox: "workspace-write", WorkRoot: t.TempDir(), MaxMinutes: 1, TaskLabel: "codex-task", InProgressLabel: "in-progress", FailedLabel: "worker-failed", AutoMerge: true}, f)
+	res := r.Run(context.Background(), issue.Issue{Number: 7})
+	if res.Status != Succeeded || res.PRURL != "https://github.com/x/y/pull/9" {
+		t.Fatalf("auto merge rejection must not fail task: %+v", res)
+	}
+	assertTaskEvent(t, r.cfg.WorkRoot, `"event":"auto_merge_rejected"`, "required checks are not complete")
+}
+
+func successfulPullRequestResponses() map[string]CommandResult {
+	return map[string]CommandResult{
+		"gh issue view 7 --repo x/y --json number,title,body,url,state,labels":                                  {Stdout: `{"number":7,"title":"Fix parser","body":"details","url":"https://github.com/x/y/issues/7","state":"OPEN","labels":[{"name":"codex-task"}]}`},
+		"gh api repos/x/y/issues/7 --jq .author_association":                                                    {Stdout: "OWNER\n"},
+		"gh repo view x/y --json defaultBranchRef --jq .defaultBranchRef.name":                                  {Stdout: "main\n"},
+		"git ls-remote --exit-code --heads git@github.com:x/y.git refs/heads/worker/issue-7":                    {ExitCode: 2, Err: errors.New("exit status 2")},
+		"git branch --show-current":                                                                             {Stdout: "worker/issue-7\n"},
+		"git rev-list --count origin/main..HEAD":                                                                {Stdout: "1\n"},
+		"gh pr list --repo x/y --head worker/issue-7 --base main --state open --json url":                       {Stdout: "[]"},
+		"gh pr create --repo x/y --base main --head worker/issue-7 --title Fix #7: Fix parser --body Closes #7": {Stdout: "https://github.com/x/y/pull/9\n"},
+	}
+}
+
+func containsCall(calls [][]string, want string) bool {
+	for _, call := range calls {
+		if strings.Join(call[1:], " ") == want {
+			return true
+		}
+	}
+	return false
+}
+
+func assertTaskEvent(t *testing.T, root string, want ...string) {
+	t.Helper()
+	entries, err := filepath.Glob(filepath.Join(root, "issue-7-*"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("task directories=%v err=%v", entries, err)
+	}
+	events, err := os.ReadFile(filepath.Join(entries[0], "events.jsonl"))
+	if err != nil {
+		t.Fatalf("read task events: %v", err)
+	}
+	for _, value := range want {
+		if !strings.Contains(string(events), value) {
+			t.Fatalf("task events missing %q: %s", value, events)
+		}
+	}
 }
 
 func TestRunnerPersistsAgentOutputAndTaskEvents(t *testing.T) {
