@@ -19,6 +19,7 @@ type Config struct {
 	WorkRoot           string
 	PollSeconds        int
 	MaxConcurrentTasks int
+	CompletedTaskRetention int
 	AutoMerge          bool
 }
 
@@ -73,6 +74,9 @@ func Load(env map[string]string) (Config, error) {
 	}
 	if cfg.MaxConcurrentTasks, err = positive(get("MAX_CONCURRENT_TASKS", "1")); err != nil {
 		return Config{}, fmt.Errorf("MAX_CONCURRENT_TASKS: %w", err)
+	}
+	if cfg.CompletedTaskRetention, err = positive(get("COMPLETED_TASK_RETENTION", "10")); err != nil {
+		return Config{}, fmt.Errorf("COMPLETED_TASK_RETENTION: %w", err)
 	}
 	if cfg.AutoMerge, err = strconv.ParseBool(get("AUTO_MERGE", "false")); err != nil {
 		return Config{}, fmt.Errorf("AUTO_MERGE: must be true or false")

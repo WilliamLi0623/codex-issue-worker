@@ -54,6 +54,11 @@ func (r *TaskRunner) Run(parent context.Context, original issue.Issue) (result R
 		result.Err = err
 		return
 	}
+	defer r.completeTaskDirectory(taskRoot)
+	if err := os.WriteFile(filepath.Join(taskRoot, activeMarker), nil, 0o600); err != nil {
+		result.Err = err
+		return
+	}
 	result.LogPath = filepath.Join(taskRoot, "task.log")
 	logFile, err := os.OpenFile(result.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {

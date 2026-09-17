@@ -34,6 +34,7 @@ worker 从进程环境读取设置，不会自行加载 `.env` 文件。[`.env.e
 | `MAX_MINUTES` | 单个任务的总时限（正整数，分钟） | `120` |
 | `POLL_SECONDS` | 队列轮询间隔（正整数，秒） | `60` |
 | `MAX_CONCURRENT_TASKS` | 并发任务数上限（正整数） | `1` |
+| `COMPLETED_TASK_RETENTION` | 保留的最新已完成任务目录数；运行中或未完成目录不会清理 | `10` |
 | `WORK_ROOT` | 保存任务克隆、锁和日志的目录 | `/home/agent/data/tasks` |
 
 `danger-full-access` 会关闭 Codex 沙箱；仅应在具备外部隔离的环境中使用。该设置不改变 Claude 的权限模式。不要把凭据写入仓库或任务 Issue。
