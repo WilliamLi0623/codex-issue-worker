@@ -1,0 +1,18 @@
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 4
+[agents.wc_explorer]
+description = "Read-only WebCodex architecture and code explorer"
+config_file = "agents/wc_explorer.toml"
+[agents.wc_worker]
+description = "Bounded implementation worker for one isolated WebCodex worktree"
+config_file = "agents/wc_worker.toml"
+[agents.wc_integrator]
+description = "Single-writer integration agent for worker commits"
+config_file = "agents/wc_integrator.toml"
+[agents.wc_validator]
+description = "Independent read-only final reviewer and validator"
+config_file = "agents/wc_validator.toml"
+[agents.wc_conflict_resolver]
+description = "Conflict specialist for non-trivial integration conflicts"
+config_file = "agents/wc_conflict_resolver.toml"
