@@ -10,10 +10,10 @@ import (
 )
 
 type gatedRunner struct {
-	active  int32
-	peak    int32
-	started chan<- int
-	release <-chan struct{}
+	active   int32
+	peak     int32
+	started  chan int
+	release  chan struct{}
 	canceled chan<- struct{}
 }
 
