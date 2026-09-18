@@ -38,6 +38,7 @@ CLI 自身不加载 env 文件；手动运行时显式提供所需环境变量�
 评审、不删除分支，也不强制推送。请求被 GitHub 拒绝时，事件日志会记录拒绝原因，但任务仍
 会成功返回 PR URL；查看 `events.jsonl` 中的 `auto_merge_skipped`、`auto_merge_requested` 或
 `auto_merge_rejected` 事件。
+Worker smoke test exercises `AUTO_MERGE`.
 
 ### Codex 沙箱与本 VM
 
