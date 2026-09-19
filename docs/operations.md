@@ -77,6 +77,7 @@ worker 调用 `codex exec` 时只设置工作目录和沙箱，不传 `--model`�
 
 user service 不加载交互 shell 配置。模板 PATH 包含 `/home/agent/.local/bin`、
 `/usr/local/bin`、`/usr/bin`、`/bin`；如果工具位于其他目录，部署时明确调整 PATH。
+若 agent 任务报 `go: command not found`，检查 worker 服务的 PATH 是否包含已配置的 Go 工具链目录。
 `NoNewPrivileges=yes` 禁止获得新权限；依赖提权的任务会失败。
 
 ## 离线验证与 user service 部署
