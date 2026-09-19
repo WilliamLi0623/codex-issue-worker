@@ -43,6 +43,8 @@ worker 从进程环境读取设置，不会自行加载 `.env` 文件。[`.env.e
 
 先确认目标仓库和队列确实适合自动执行：worker 启动后会持续轮询所有匹配标签的开放 Issue，并可能推送分支、创建 Pull Request。`AUTO_MERGE=true` 时，worker 只会对自己创建或恢复的 PR 请求 GitHub 的保护性自动合并，使用 squash 方法；不会绕过评审、检查或冲突规则。完成 GitHub CLI 与所选 agent CLI 登录后，在 Linux shell 中设置目标仓库并启动：
 
+按默认配置，Issue 必须带有 `codex-task` 标签才会被 worker 领取；未带该标签的 Issue 会保持不变。
+
 ```bash
 export GH_REPO=owner/repository
 ./codex-issue-worker
