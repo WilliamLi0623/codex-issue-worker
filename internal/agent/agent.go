@@ -16,7 +16,7 @@ func Prompt(number int, title, url, body string) string {
 	return fmt.Sprintf(`Work on GitHub issue #%d: %s
 Issue URL: %s
 
-Explain the plan first and inspect applicable skills. Read relevant files and callers before editing.
+This Issue is already authorized for unattended execution. State a brief plan, then continue immediately; do not ask for confirmation or wait for a reply. Inspect applicable skills and read relevant files and callers before editing.
 Do not delete data, perform destructive Git operations, rewrite history, force push, or modify the default branch.
 Use tests to drive the change and report the verification you actually ran.
 

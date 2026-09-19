@@ -35,6 +35,15 @@ func TestPromptCarriesSafetyAndVerification(t *testing.T) {
 	}
 }
 
+func TestPromptAuthorizesHeadlessExecutionWithoutConfirmation(t *testing.T) {
+	p := Prompt(7, "Fix parser", "https://github.com/x/y/issues/7", "body")
+	for _, needle := range []string{"already authorized", "do not ask for confirmation"} {
+		if !contains(p, needle) {
+			t.Fatalf("prompt missing %q", needle)
+		}
+	}
+}
+
 func contains(s, sub string) bool { return len(sub) == 0 || len(s) >= len(sub) && index(s, sub) >= 0 }
 func index(s, sub string) int {
 	for i := 0; i+len(sub) <= len(s); i++ {
